@@ -42,8 +42,13 @@ const myReviews = computed(() =>
             <div class="d-flex flex-wrap gap-2 mb-3">
               <RouterLink class="btn btn-dark" to="/submit-game">Submit a game</RouterLink>
               <RouterLink class="btn btn-dark" to="/submit-review">Submit a review</RouterLink>
-              <RouterLink class="btn btn-outline-dark" to="/admin">Manage catalogue</RouterLink>
               <RouterLink class="btn btn-outline-dark" to="/reviews">View reviews</RouterLink>
+            </div>
+            <div v-if="store.isAdmin.value">
+              <h2 class="h4">Admin actions</h2>
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                <RouterLink class="btn btn-outline-dark" to="/admin">Manage catalogue</RouterLink>
+              </div>
             </div>
             <h3 class="h5">Your reviews</h3>
             <p v-if="myReviews.length === 0" class="text-secondary mb-0">No reviews yet.</p>
