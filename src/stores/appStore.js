@@ -23,6 +23,36 @@ function persistUser(user) {
   }
 }
 
+// ── snake_case <-> camelCase conversion ───────────────────────
+
+function toCamel(str) {
+  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+}
+
+function toSnake(str) {
+  return str.replace(/[A-Z]/g, c => '_' + c.toLowerCase())
+}
+
+function keysToCamel(obj) {
+  if (Array.isArray(obj)) return obj.map(keysToCamel)
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj).map(([k, v]) => [toCamel(k), keysToCamel(v)])
+    )
+  }
+  return obj
+}
+
+function keysToSnake(obj) {
+  if (Array.isArray(obj)) return obj.map(keysToSnake)
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj).map(([k, v]) => [toSnake(k), keysToSnake(v)])
+    )
+  }
+  return obj
+}
+
 // ── Shared state (mirrors the original store shape) ───────────
 const state = reactive({
   games: [],
@@ -32,40 +62,44 @@ const state = reactive({
 })
 
 // ── Generic REST helpers ──────────────────────────────────────
+// Responses are converted to camelCase, request bodies to snake_case
 
 async function apiGet(table, field = '', value = '') {
-  const path = field ? `${API_BASE}/${table}/${field}/${encodeURIComponent(value)}` : `${API_BASE}/${table}`
+  const snakeField = field ? toSnake(field) : ''
+  const path = snakeField ? `${API_BASE}/${table}/${snakeField}/${encodeURIComponent(value)}` : `${API_BASE}/${table}`
   const res = await fetch(path)
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
-  return res.json()
+  return res.json().then(keysToCamel)
 }
 
 async function apiPost(table, body) {
   const res = await fetch(`${API_BASE}/${table}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(keysToSnake(body)),
   })
   if (!res.ok) throw new Error(`POST ${table} failed: ${res.status}`)
-  return res.json()           // { id: <newId> }
+  return res.json().then(keysToCamel)
 }
 
 async function apiPut(table, field, value, body) {
-  const path = `${API_BASE}/${table}/${field}/${encodeURIComponent(value)}`
+  const snakeField = toSnake(field)
+  const path = `${API_BASE}/${table}/${snakeField}/${encodeURIComponent(value)}`
   const res = await fetch(path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(keysToSnake(body)),
   })
   if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
-  return res.json()           // { affected: n }
+  return res.json().then(keysToCamel)
 }
 
 async function apiDelete(table, field, value) {
-  const path = `${API_BASE}/${table}/${field}/${encodeURIComponent(value)}`
+  const snakeField = toSnake(field)
+  const path = `${API_BASE}/${table}/${snakeField}/${encodeURIComponent(value)}`
   const res = await fetch(path, { method: 'DELETE' })
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
-  return res.json()           // { affected: n }
+  return res.json().then(keysToCamel)
 }
 
 // ── Slug helper ───────────────────────────────────────────────
@@ -86,11 +120,13 @@ export function useAppStore() {
   // ── Data loading (call once from App.vue) ──────────────────
 
   async function loadGames() {
-    state.games = await apiGet('games')
+    const data = await apiGet('games')
+    state.games = data.map(g => ({ ...g, rating: Number(g.rating), likes: Number(g.likes) }))
   }
 
   async function loadReviews() {
-    state.reviews = await apiGet('reviews')
+    const data = await apiGet('reviews')
+    state.reviews = data.map(r => ({ ...r, score: Number(r.score), gameId: Number(r.gameId) }))
   }
 
   // ── Auth ───────────────────────────────────────────────────
