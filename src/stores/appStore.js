@@ -1,44 +1,126 @@
 import { computed, reactive } from 'vue'
-import { seedGames, seedReviews } from '../data/games'
 
-const STORAGE_KEY = 'gamebench-state-v1'
+const API_BASE = `${import.meta.env.BASE_URL}resources/apis.php`
+const SESSION_KEY = 'gamebench-current-user'
+const VOTES_KEY = 'gamebench-votes-v1'
 
-function loadState() {
-  const freshState = () => ({
-    games: seedGames,
-    reviews: seedReviews,
-    currentUser: null,
-    users: [{ name: 'Demo Member', email: 'demo@gamebench.test', password: 'password123', role: 'member' }],
-    votes: {},
+function loadLocal(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || fallback
+  } catch {
+    return fallback
+  }
+}
+
+const state = reactive({
+  games: [],
+  reviews: [],
+  users: [],
+  currentUser: loadLocal(SESSION_KEY, null),
+  votes: loadLocal(VOTES_KEY, {}),
+})
+
+function saveSession() {
+  if (state.currentUser) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(state.currentUser))
+  } else {
+    localStorage.removeItem(SESSION_KEY)
+  }
+}
+
+function saveVotes() {
+  localStorage.setItem(VOTES_KEY, JSON.stringify(state.votes))
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...options,
   })
 
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (!saved) {
-    return freshState()
-  }
+  return await response.json()
+}
 
-  try {
-    const parsed = JSON.parse(saved)
-    return {
-      games: parsed.games?.length ? parsed.games : seedGames,
-      reviews: parsed.reviews?.length ? parsed.reviews : seedReviews,
-      currentUser: parsed.currentUser || null,
-      users: parsed.users?.length ? parsed.users : [],
-      votes: parsed.votes || {},
-    }
-  } catch {
-    return freshState()
+function dbGameToVue(game) {
+  return {
+    id: Number(game.id),
+    slug: game.slug,
+    title: game.title,
+    studio: game.studio,
+    genre: game.genre,
+    releaseYear: Number(game.release_year),
+    rating: Number(game.rating),
+    likes: Number(game.likes),
+    coverTheme: game.cover_theme,
+    summary: game.summary,
+    notes: game.notes,
+    platform: [], // simple API does not automatically load game_platforms
+    tags: [],
+
+    min: {
+      cpu: game.min_cpu,
+      gpu: game.min_gpu,
+      ram: Number(game.min_ram),
+      storage: Number(game.min_storage),
+      os: game.min_os,
+    },
+
+    rec: {
+      cpu: game.rec_cpu,
+      gpu: game.rec_gpu,
+      ram: Number(game.rec_ram),
+      storage: Number(game.rec_storage),
+      os: game.rec_os,
+    },
   }
 }
 
-const state = reactive(loadState())
+function vueGameToDb(game) {
+  return {
+    slug: makeSlug(game.title),
+    title: game.title,
+    studio: game.studio,
+    genre: game.genre,
+    release_year: Number(game.releaseYear),
+    rating: Number(game.rating || 0),
+    likes: Number(game.likes || 0),
+    cover_theme: game.coverTheme || 'cover-space',
+    summary: game.summary,
+    notes: game.notes || '',
 
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    min_cpu: game.min.cpu,
+    min_gpu: game.min.gpu,
+    min_ram: Number(game.min.ram),
+    min_storage: Number(game.min.storage),
+    min_os: game.min.os,
+
+    rec_cpu: game.rec.cpu,
+    rec_gpu: game.rec.gpu,
+    rec_ram: Number(game.rec.ram),
+    rec_storage: Number(game.rec.storage),
+    rec_os: game.rec.os,
+  }
 }
 
-function nextId(collection) {
-  return collection.length ? Math.max(...collection.map((item) => item.id)) + 1 : 1
+function dbReviewToVue(review) {
+  return {
+    id: Number(review.id),
+    gameId: Number(review.game_id),
+    author: review.author,
+    score: Number(review.score),
+    comment: review.comment,
+  }
+}
+
+function vueReviewToDb(review) {
+  return {
+    game_id: Number(review.gameId),
+    author: review.author,
+    score: Number(review.score),
+    comment: review.comment,
+  }
 }
 
 function makeSlug(title) {
@@ -52,68 +134,130 @@ export function useAppStore() {
   const isAuthenticated = computed(() => Boolean(state.currentUser))
   const isAdmin = computed(() => state.currentUser?.role === 'admin')
 
-  function login(email, password) {
-    const user = state.users.find((entry) => entry.email === email && entry.password === password)
+  async function loadGames() {
+    const games = await api('/games')
+    state.games = games.map(dbGameToVue)
+  }
+
+  async function loadReviews() {
+    const reviews = await api('/reviews')
+    state.reviews = reviews.map(dbReviewToVue)
+  }
+
+  async function loadUsers() {
+    state.users = await api('/users')
+  }
+
+  async function loadAll() {
+    await loadGames()
+    await loadReviews()
+    await loadUsers()
+  }
+
+  async function login(email, password) {
+    const users = await api(`/users/email/${email}`)
+    const user = users.find(user => user.email === email && user.password === password)
+
     if (!user) return false
-    state.currentUser = { name: user.name, email: user.email, role: user.role }
-    persist()
+
+    state.currentUser = {
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    }
+
+    saveSession()
     return true
   }
 
-  function register(payload) {
-    if (state.users.some((user) => user.email === payload.email)) {
-      return { ok: false, message: 'An account with this email already exists.' }
+  async function register(payload) {
+    const users = await api(`/users/email/${payload.email}`)
+
+    if (users.length > 0) {
+      return {
+        ok: false,
+        message: 'An account with this email already exists.',
+      }
     }
 
-    const role = state.users.length === 0 ? 'admin' : 'member'
-    state.users.push({ ...payload, role })
-    state.currentUser = { name: payload.name, email: payload.email, role }
-    persist()
+    const allUsers = await api('/users')
+    const role = allUsers.length === 0 ? 'admin' : 'member'
+
+    await api('/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        role,
+      }),
+    })
+
+    state.currentUser = {
+      name: payload.name,
+      email: payload.email,
+      role,
+    }
+
+    saveSession()
+
     return { ok: true }
   }
 
   function logout() {
     state.currentUser = null
-    persist()
+    saveSession()
   }
 
-  function addGame(payload) {
-    const id = nextId(state.games)
+  async function addGame(payload) {
+    const dbPayload = vueGameToDb(payload)
+
+    const result = await api('/games', {
+      method: 'POST',
+      body: JSON.stringify(dbPayload),
+    })
+
     state.games.push({
       ...payload,
-      id,
-      slug: makeSlug(payload.title),
+      id: Number(result.id),
+      slug: dbPayload.slug,
       likes: 0,
       rating: Number(payload.rating || 0),
       releaseYear: Number(payload.releaseYear),
-      coverTheme: payload.coverTheme || 'cover-space',
-      platform: Array.isArray(payload.platform) ? payload.platform : String(payload.platform).split(',').map((item) => item.trim()),
     })
-    persist()
   }
 
-  function updateGame(id, payload) {
-    const index = state.games.findIndex((game) => game.id === id)
-    if (index === -1) return
-    state.games[index] = {
-      ...state.games[index],
+  async function updateGame(id, payload) {
+    const existing = state.games.find(game => game.id === id)
+    if (!existing) return
+
+    const updated = {
+      ...existing,
       ...payload,
-      slug: makeSlug(payload.title || state.games[index].title),
-      releaseYear: Number(payload.releaseYear || state.games[index].releaseYear),
-      rating: Number(payload.rating || state.games[index].rating),
     }
-    persist()
+
+    await api(`/games/id/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(vueGameToDb(updated)),
+    })
+
+    const index = state.games.findIndex(game => game.id === id)
+    state.games[index] = updated
   }
 
-  function deleteGame(id) {
-    state.games = state.games.filter((game) => game.id !== id)
-    state.reviews = state.reviews.filter((review) => review.gameId !== id)
-    persist()
+  async function deleteGame(id) {
+    await api(`/games/id/${id}`, {
+      method: 'DELETE',
+    })
+
+    state.games = state.games.filter(game => game.id !== id)
+    state.reviews = state.reviews.filter(review => review.gameId !== id)
   }
 
-  function toggleLike(gameId) {
+  async function toggleLike(gameId) {
     const key = `${state.currentUser?.email || 'guest'}-${gameId}`
-    const game = state.games.find((entry) => entry.id === gameId)
+    const game = state.games.find(game => game.id === gameId)
+
     if (!game) return
 
     if (state.votes[key]) {
@@ -123,30 +267,50 @@ export function useAppStore() {
       game.likes += 1
       state.votes[key] = true
     }
-    persist()
+
+    saveVotes()
+
+    await api(`/games/id/${gameId}`, {
+      method: 'PUT',
+      body: JSON.stringify(vueGameToDb(game)),
+    })
   }
 
-  function addReview(payload) {
-    state.reviews.unshift({ id: nextId(state.reviews), ...payload, score: Number(payload.score) })
-    persist()
+  async function addReview(payload) {
+    const result = await api('/reviews', {
+      method: 'POST',
+      body: JSON.stringify(vueReviewToDb(payload)),
+    })
+
+    state.reviews.unshift({
+      id: Number(result.id),
+      ...payload,
+      score: Number(payload.score),
+    })
   }
 
-  function deleteReview(id) {
-    state.reviews = state.reviews.filter((review) => review.id !== id)
-    persist()
+  async function deleteReview(id) {
+    await api(`/reviews/id/${id}`, {
+      method: 'DELETE',
+    })
+
+    state.reviews = state.reviews.filter(review => review.id !== id)
   }
 
-  function resetDemoData() {
-    state.games = seedGames.map((game) => ({ ...game, min: { ...game.min }, rec: { ...game.rec } }))
-    state.reviews = seedReviews.map((review) => ({ ...review }))
+  async function resetDemoData() {
     state.votes = {}
-    persist()
+    saveVotes()
+    await loadAll()
   }
 
   return {
     state,
     isAuthenticated,
     isAdmin,
+    loadGames,
+    loadReviews,
+    loadUsers,
+    loadAll,
     login,
     register,
     logout,
