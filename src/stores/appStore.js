@@ -1,4 +1,4 @@
-﻿import { computed, reactive, ref } from 'vue'
+﻿import { computed, reactive } from 'vue'
 
 // ── API base URL — update to match your server path ──────────
 const API_BASE = import.meta.env.BASE_URL + 'resources/apis.php'
@@ -33,43 +33,39 @@ const state = reactive({
 
 // ── Generic REST helpers ──────────────────────────────────────
 
-function apiGet(table, field = '', value = '') {
+async function apiGet(table, field = '', value = '') {
   const path = field ? `${API_BASE}/${table}/${field}/${encodeURIComponent(value)}` : `${API_BASE}/${table}`
-  return fetch(path).then(res => {
-    if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
-    return res.json()
-  })
+  const res = await fetch(path)
+  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  return res.json()
 }
 
-function apiPost(table, body) {
-  return fetch(`${API_BASE}/${table}`, {
+async function apiPost(table, body) {
+  const res = await fetch(`${API_BASE}/${table}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  }).then(res => {
-    if (!res.ok) throw new Error(`POST ${table} failed: ${res.status}`)
-    return res.json()           // { id: <newId> }
   })
+  if (!res.ok) throw new Error(`POST ${table} failed: ${res.status}`)
+  return res.json()           // { id: <newId> }
 }
 
-function apiPut(table, field, value, body) {
+async function apiPut(table, field, value, body) {
   const path = `${API_BASE}/${table}/${field}/${encodeURIComponent(value)}`
-  return fetch(path, {
+  const res = await fetch(path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  }).then(res => {
-    if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
-    return res.json()           // { affected: n }
   })
+  if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
+  return res.json()           // { affected: n }
 }
 
-function apiDelete(table, field, value) {
+async function apiDelete(table, field, value) {
   const path = `${API_BASE}/${table}/${field}/${encodeURIComponent(value)}`
-  return fetch(path, { method: 'DELETE' }).then(res => {
-    if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
-    return res.json()           // { affected: n }
-  })
+  const res = await fetch(path, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
+  return res.json()           // { affected: n }
 }
 
 // ── Slug helper ───────────────────────────────────────────────
@@ -89,42 +85,38 @@ export function useAppStore() {
 
   // ── Data loading (call once from App.vue) ──────────────────
 
-  function loadGames() {
-    return apiGet('games').then(data => { state.games = data })
+  async function loadGames() {
+    state.games = await apiGet('games')
   }
 
-  function loadReviews() {
-    return apiGet('reviews').then(data => { state.reviews = data })
+  async function loadReviews() {
+    state.reviews = await apiGet('reviews')
   }
 
   // ── Auth ───────────────────────────────────────────────────
 
-  function login(email, password) {
-    return apiGet('users', 'email', email).then(rows => {
-      const user = rows[0]
-      if (!user || user.password !== password) return false
-      const profile = { id: Number(user.id), name: user.name, email: user.email, role: user.role }
-      state.currentUser = profile
-      persistUser(profile)
-      return true
-    })
+  async function login(email, password) {
+    const rows = await apiGet('users', 'email', email)
+    const user = rows[0]
+    if (!user || user.password !== password) return false
+    const profile = { id: Number(user.id), name: user.name, email: user.email, role: user.role }
+    state.currentUser = profile
+    persistUser(profile)
+    return true
   }
 
-  function register(payload) {
-    return apiGet('users', 'email', payload.email).then(existing => {
-      if (existing.length > 0) {
-        return { ok: false, message: 'An account with this email already exists.' }
-      }
-      return apiGet('users').then(allUsers => {
-        const role = allUsers.length === 0 ? 'admin' : 'member'
-        return apiPost('users', { ...payload, role }).then(result => {
-          const profile = { id: result.id, name: payload.name, email: payload.email, role }
-          state.currentUser = profile
-          persistUser(profile)
-          return { ok: true }
-        })
-      })
-    })
+  async function register(payload) {
+    const existing = await apiGet('users', 'email', payload.email)
+    if (existing.length > 0) {
+      return { ok: false, message: 'An account with this email already exists.' }
+    }
+    const allUsers = await apiGet('users')
+    const role = allUsers.length === 0 ? 'admin' : 'member'
+    const result = await apiPost('users', { ...payload, role })
+    const profile = { id: result.id, name: payload.name, email: payload.email, role }
+    state.currentUser = profile
+    persistUser(profile)
+    return { ok: true }
   }
 
   function logout() {
@@ -139,8 +131,8 @@ export function useAppStore() {
 
   // ── Games ──────────────────────────────────────────────────
 
-  function addGame(payload) {
-    return apiPost('games', {
+  async function addGame(payload) {
+    await apiPost('games', {
       ...payload,
       slug: makeSlug(payload.title),
       releaseYear: Number(payload.releaseYear),
@@ -150,26 +142,27 @@ export function useAppStore() {
       platform: Array.isArray(payload.platform)
         ? payload.platform
         : String(payload.platform).split(',').map(s => s.trim()),
-    }).then(() => loadGames())
+    })
+    await loadGames()
   }
 
-  function updateGame(id, payload) {
-    return apiPut('games', 'id', id, {
+  async function updateGame(id, payload) {
+    await apiPut('games', 'id', id, {
       ...payload,
       slug: makeSlug(payload.title),
       releaseYear: Number(payload.releaseYear),
       rating: Number(payload.rating),
-    }).then(() => loadGames())
-  }
-
-  function deleteGame(id) {
-    return apiDelete('games', 'id', id).then(() => {
-      state.games = state.games.filter(g => g.id !== id)
-      state.reviews = state.reviews.filter(r => r.gameId !== id)
     })
+    await loadGames()
   }
 
-  function toggleLike(gameId) {
+  async function deleteGame(id) {
+    await apiDelete('games', 'id', id)
+    state.games = state.games.filter(g => g.id !== id)
+    state.reviews = state.reviews.filter(r => r.gameId !== id)
+  }
+
+  async function toggleLike(gameId) {
     const key = `${state.currentUser?.email || 'guest'}-${gameId}`
     const game = state.games.find(g => g.id === gameId)
     if (!game) return
@@ -178,33 +171,30 @@ export function useAppStore() {
       ? Math.max(0, game.likes - 1)
       : game.likes + 1
 
-    return apiPut('games', 'id', gameId, { likes: newLikes }).then(() => {
-      game.likes = newLikes
-      if (state.votes[key]) {
-        delete state.votes[key]
-      } else {
-        state.votes[key] = true
-      }
-    })
+    await apiPut('games', 'id', gameId, { likes: newLikes })
+    game.likes = newLikes
+    if (state.votes[key]) {
+      delete state.votes[key]
+    } else {
+      state.votes[key] = true
+    }
   }
 
   // ── Reviews ────────────────────────────────────────────────
 
-  function addReview(payload) {
-    return apiPost('reviews', {
-      ...payload,
-      score: Number(payload.score),
-    }).then(() => loadReviews())
+  async function addReview(payload) {
+    await apiPost('reviews', { ...payload, score: Number(payload.score) })
+    await loadReviews()
   }
 
-  function updateReview(id, fields) {
-    return apiPut('reviews', 'id', id, fields).then(() => loadReviews())
+  async function updateReview(id, fields) {
+    await apiPut('reviews', 'id', id, fields)
+    await loadReviews()
   }
 
-  function deleteReview(id) {
-    return apiDelete('reviews', 'id', id).then(() => {
-      state.reviews = state.reviews.filter(r => r.id !== id)
-    })
+  async function deleteReview(id) {
+    await apiDelete('reviews', 'id', id)
+    state.reviews = state.reviews.filter(r => r.id !== id)
   }
 
   return {
