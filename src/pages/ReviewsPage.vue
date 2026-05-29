@@ -280,7 +280,7 @@ const getRatingBadgeClass = (score) => {
       <div class="row g-3">
         <div class="col-md-4">
           <div class="content-card p-3">
-            <h5>🎯 Be Specific</h5>
+            <h5> Be Specific</h5>
             <p class="small text-secondary mb-0">
               Mention specific aspects like graphics, gameplay, story, and performance to help other players.
             </p>
@@ -288,7 +288,7 @@ const getRatingBadgeClass = (score) => {
         </div>
         <div class="col-md-4">
           <div class="content-card p-3">
-            <h5>⚖️ Be Fair</h5>
+            <h5> Be Fair</h5>
             <p class="small text-secondary mb-0">
               Rate games fairly based on their genre and target audience. Compare similar games.
             </p>
@@ -296,7 +296,7 @@ const getRatingBadgeClass = (score) => {
         </div>
         <div class="col-md-4">
           <div class="content-card p-3">
-            <h5>✨ Be Constructive</h5>
+            <h5>Be Constructive</h5>
             <p class="small text-secondary mb-0">
               Provide constructive criticism that helps developers and fellow gamers understand strengths and weaknesses.
             </p>

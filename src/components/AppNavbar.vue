@@ -36,6 +36,7 @@ function logout() {
           <li class="nav-item"><RouterLink class="nav-link" to="/requirements-guide">Guide</RouterLink></li>
           <li class="nav-item"><RouterLink class="nav-link" to="/compatibility-checker">Checker</RouterLink></li>
           <li class="nav-item"><RouterLink class="nav-link" to="/reviews">Reviews</RouterLink></li>
+          <li class="nav-item"><RouterLink class="nav-link" to="/analytics">Analytics</RouterLink></li>
           <li class="nav-item"><RouterLink class="nav-link" to="/team-plan">Team Plan</RouterLink></li>
         </ul>
         <div class="d-flex align-items-center gap-2">

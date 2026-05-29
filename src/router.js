@@ -14,6 +14,7 @@ import SubmitReviewPage from './pages/SubmitReviewPage.vue'
 import AdminPage from './pages/AdminPage.vue'
 import TeamPlanPage from './pages/TeamPlanPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
+import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage.vue'
 
 const routes = [
   { path: '/', name: 'home', component: HomePage },
@@ -31,6 +32,7 @@ const routes = [
   { path: '/team-plan', name: 'team-plan', component: TeamPlanPage },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
   { path: '/submit-review', name: 'submit-review', component: SubmitReviewPage },
+  { path: '/analytics', name: 'analytics', component: AnalyticsDashboardPage },
 ]
 
 export default createRouter({
