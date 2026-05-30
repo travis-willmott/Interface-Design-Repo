@@ -65,8 +65,8 @@ function validateForm() {
     valid = false
   }
   const year = Number(form.releaseYear)
-  if (!year || year < 1980 || year > 2035) {
-    errors.releaseYear = 'Release year must be between 1980 and 2035.'
+  if (!year || year < 1980 || year > 2026) {
+    errors.releaseYear = 'Release year must be between 1980 and 2026.'
     valid = false
   }
   if (!form.platform.trim()) {
