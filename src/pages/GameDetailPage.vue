@@ -1,7 +1,8 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../stores/appStore'
+import gsap from 'gsap'
 
 const route = useRoute()
 const router = useRouter()
@@ -9,7 +10,24 @@ const store = useAppStore()
 const error = ref('')
 
 const game = computed(() => store.state.games.find((entry) => entry.slug === route.params.slug))
+
 const gameReviews = computed(() => store.state.reviews.filter((review) => review.gameId === game.value?.id))
+const tweened = reactive({
+  number: 0
+})
+
+// Note: For inputs greater than Number.MAX_SAFE_INTEGER (9007199254740991),
+// the result may be inaccurate due to limitations in JavaScript number precision.
+watch(
+  () => game.value?.likes,
+  (n) => {
+    gsap.to(tweened, {
+      duration: 0.5,
+      number: Number(n) || 0
+    })
+  },
+  { immediate: true }
+)
 
 const reviewForm = reactive({
   score: 5,
@@ -43,7 +61,7 @@ function deleteCurrentGame() {
 </script>
 
 <template>
-  <section v-if="game" class="section-band">
+   <section v-if="game" class="section-band">
     <div class="container">
       <div class="row g-4 align-items-start">
         <div class="col-lg-5">
@@ -59,7 +77,13 @@ function deleteCurrentGame() {
             <span v-for="tag in game.tags" :key="tag" class="tag-chip">{{ tag }}</span>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-outline-danger" type="button" @click="store.toggleLike(game.id)">Like {{ game.likes }}</button>
+            <button
+            class="btn btn-outline-danger"
+            type="button"
+            @click="store.toggleLike(game.id)"
+            >
+              Like {{ tweened.number.toFixed(0) }}
+            </button>            
             <RouterLink class="btn btn-dark" to="/compare">Compare with another game</RouterLink>
             <button v-if="store.isAuthenticated.value" class="btn btn-outline-dark" type="button" @click="deleteCurrentGame">Delete entry</button>
           </div>

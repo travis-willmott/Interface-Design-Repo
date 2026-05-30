@@ -4,6 +4,8 @@ import GameCard from '../components/GameCard.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAppStore } from '../stores/appStore'
 import Paginate from 'vuejs-paginate-next'
+import { motion } from 'motion-v'
+
 
 
 const store = useAppStore()
@@ -12,6 +14,10 @@ const genre = ref('All')
 const sortBy = ref('rating')
 const page = ref(1)
 const perPage = ref(6)
+
+const x = ref(0)
+const startx = ref(-300)
+
 
 const genres = computed(() => ['All', ...new Set(store.state.games.map((game) => game.genre))])
 
@@ -82,8 +88,34 @@ function setPage(nextPage) {
       </div>
 
       <div class="row g-4">
-        <div v-for="game in pagedGames" :key="game.id" class="col-md-6 col-xl-4">
-          <GameCard :game="game" />
+        <div class="row g-4" :key="page + '-' + filteredGames.length + '-' + perPage">
+
+          <motion.div
+            v-for="(game,index) in pagedGames"
+            :key="game.id"
+            class="col-md-6 col-xl-4"
+
+            :initial="{
+              opacity:0,
+              x:startx,
+              scale:0.9
+            }"
+
+            :animate="{
+              opacity:1,
+              x:0,
+              scale:1
+            }"
+
+            :transition="{
+              duration:0.5,
+              delay:index * 0.08,
+              type:'spring'
+            }"
+          >
+              <GameCard :game="game" />
+          </motion.div>
+
         </div>
       </div>
       
@@ -98,6 +130,7 @@ function setPage(nextPage) {
             <option :value="12">12</option>
         </select>
       </nav>
+
 
 
 
