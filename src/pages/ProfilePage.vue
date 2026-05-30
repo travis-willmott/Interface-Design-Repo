@@ -51,6 +51,21 @@ const sortOptions = [
   { value: 'score-desc', label: 'Score: high to low' },
 ]
 
+// --- Pagination ---
+const currentPage = ref(1)
+const perPage = ref(3)
+
+function setPage(page) {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  editingReviewId.value = null
+}
+
+function onSortChange() {
+  currentPage.value = 1
+  editingReviewId.value = null
+}
+
 // --- Reviews ---
 const gameTitle = (gameId) => {
   const game = store.state.games.find((game) => game.id === gameId)
@@ -70,6 +85,13 @@ const myReviews = computed(() => {
       default: return 0
     }
   })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(myReviews.value.length / perPage.value)))
+
+const pagedReviews = computed(() => {
+  const start = (currentPage.value - 1) * perPage.value
+  return myReviews.value.slice(start, start + perPage.value)
 })
 </script>
 
@@ -121,18 +143,21 @@ const myReviews = computed(() => {
         <!-- Reviews Section -->
         <div class="content-card p-3">
           <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-            <h3 class="h5 mb-0">Your reviews <span class="text-secondary fw-normal fs-6">({{ myReviews.length }})</span></h3>
-            <select v-if="myReviews.length > 0" v-model="sortKey" class="form-select form-select-sm w-auto">
+            <h3 class="h5 mb-0">
+              Your reviews
+              <span class="text-secondary fw-normal fs-6">({{ myReviews.length }})</span>
+            </h3>
+            <select v-model="sortKey" class="form-select form-select-sm w-auto" @change="onSortChange">
               <option v-for="option in sortOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
               </option>
             </select>
           </div>
 
-          <p v-if="myReviews.length === 0" class="text-secondary mb-0">No reviews yet.</p>
+          <p v-if="myReviews.length === 0" class="text-secondary mb-3">No reviews yet.</p>
 
-          <div v-else class="row g-3">
-            <div v-for="review in myReviews" :key="review.id" class="col-md-6 col-lg-4">
+          <div v-else class="row g-3 mb-3">
+            <div v-for="review in pagedReviews" :key="review.id" class="col-md-6 col-lg-4">
               <div class="review-card p-3 h-100">
                 <!-- View mode -->
                 <template v-if="editingReviewId !== review.id">
@@ -165,6 +190,20 @@ const myReviews = computed(() => {
               </div>
             </div>
           </div>
+
+          <!-- Pagination — always visible -->
+          <nav class="d-flex justify-content-center gap-2 mt-2" aria-label="Reviews pagination">
+            <button class="btn btn-outline-dark" type="button"
+              :disabled="currentPage === 1" @click="setPage(currentPage - 1)">Previous</button>
+            <span class="btn btn-light disabled">Page {{ currentPage }} of {{ totalPages }}</span>
+            <button class="btn btn-outline-dark" type="button"
+              :disabled="currentPage === totalPages" @click="setPage(currentPage + 1)">Next</button>
+            <select v-model="perPage" class="btn btn-outline-dark" @change="setPage(1)">
+              <option :value="3">3</option>
+              <option :value="6">6</option>
+              <option :value="9">9</option>
+            </select>
+          </nav>
         </div>
       </template>
     </div>
