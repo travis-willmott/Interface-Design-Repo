@@ -3,13 +3,21 @@ import { computed, ref } from 'vue'
 import GameCard from '../components/GameCard.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAppStore } from '../stores/appStore'
+import Paginate from 'vuejs-paginate-next'
+import { motion } from 'motion-v'
+
+
 
 const store = useAppStore()
 const search = ref('')
 const genre = ref('All')
 const sortBy = ref('rating')
 const page = ref(1)
-const perPage = 6
+const perPage = ref(6)
+
+const x = ref(0)
+const startx = ref(-300)
+
 
 const genres = computed(() => ['All', ...new Set(store.state.games.map((game) => game.genre))])
 
@@ -30,8 +38,13 @@ const filteredGames = computed(() => {
   })
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredGames.value.length / perPage)))
-const pagedGames = computed(() => filteredGames.value.slice((page.value - 1) * perPage, page.value * perPage))
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredGames.value.length / perPage.value)))
+const pagedGames = computed(() => {
+  const current = page.value * perPage.value
+  const start = current - perPage.value
+
+  return filteredGames.value.slice(start, current)
+})
 
 function setPage(nextPage) {
   page.value = Math.min(Math.max(nextPage, 1), totalPages.value)
@@ -75,16 +88,52 @@ function setPage(nextPage) {
       </div>
 
       <div class="row g-4">
-        <div v-for="game in pagedGames" :key="game.id" class="col-md-6 col-xl-4">
-          <GameCard :game="game" />
+        <div class="row g-4" :key="page + '-' + filteredGames.length + '-' + perPage">
+
+          <motion.div
+            v-for="(game,index) in pagedGames"
+            :key="game.id"
+            class="col-md-6 col-xl-4"
+
+            :initial="{
+              opacity:0,
+              x:startx,
+              scale:0.9
+            }"
+
+            :animate="{
+              opacity:1,
+              x:0,
+              scale:1
+            }"
+
+            :transition="{
+              duration:0.5,
+              delay:index * 0.08,
+              type:'spring'
+            }"
+          >
+              <GameCard :game="game" />
+          </motion.div>
+
         </div>
       </div>
+      
 
       <nav class="d-flex justify-content-center gap-2 mt-4" aria-label="Catalogue pagination">
         <button class="btn btn-outline-dark" type="button" :disabled="page === 1" @click="setPage(page - 1)">Previous</button>
         <span class="btn btn-light disabled">Page {{ page }} of {{ totalPages }}</span>
         <button class="btn btn-outline-dark" type="button" :disabled="page === totalPages" @click="setPage(page + 1)">Next</button>
+        <select v-model="perPage"  class="btn btn-outline-dark" @change="setPage(1)">
+            <option :value="6">6</option>
+            <option :value="9">9</option>
+            <option :value="12">12</option>
+        </select>
       </nav>
+
+
+
+
     </div>
   </section>
 </template>
