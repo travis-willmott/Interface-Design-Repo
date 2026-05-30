@@ -85,10 +85,10 @@ async function submit() {
         
         <div class="text-center mt-3">
           <p class="small text-secondary mb-0">
-            Don't have an account? <RouterLink to="/register">Register here</RouterLink>.
+            Dont have an account? <RouterLink to="/register">Register here</RouterLink>.
           </p>
         </div>
       </form>
     </div>
   </section>
-</template>
+</template> 

@@ -7,7 +7,7 @@ import { useAppStore } from '../stores/appStore'
 const router = useRouter()
 const store = useAppStore()
 const error = ref('')
-const isLoading = ref(false)
+const isLoading = ref( false)
 
 const form = reactive({
   name: '',
